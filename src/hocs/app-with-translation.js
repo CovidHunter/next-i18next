@@ -2,7 +2,7 @@ import React from 'react'
 import Router from 'next/router'
 
 import { I18nextProvider } from 'react-i18next'
-import { createConsoleMessage, lngPathCorrector } from 'utils'
+import { lngPathCorrector } from 'utils'
 import { NextStaticProvider } from 'components'
 
 import hoistNonReactStatics from 'hoist-non-react-statics'
@@ -12,17 +12,6 @@ export default function (WrappedComponent) {
   const { config, i18n } = this
 
   class AppWithTranslation extends React.Component {
-
-    static createConsoleMessage(type, message) {
-      createConsoleMessage(
-        type,
-        message,
-        {
-          strictMode: config.strictMode,
-          traceLimit: config.errorStackTraceLimit,
-        },
-      )
-    }
 
     constructor() {
       super()
@@ -81,12 +70,9 @@ export default function (WrappedComponent) {
       let namespacesRequired = config.ns
       if (Array.isArray(pageProps.namespacesRequired)) {
         ({ namespacesRequired } = pageProps)
+      } else if (process.env.NODE_ENV !== 'production') {
+        console.warn(`You have not declared a namespacesRequired array on your page-level component: ${Component.displayName}. This will cause all namespaces to be sent down to the client, possibly negatively impacting the performance of your app. For more info, see: https://github.com/isaachinman/next-i18next#4-declaring-namespace-dependencies`)
       }
-      this.createConsoleMessage(
-        'warn',
-        `You have not declared a namespacesRequired array on your page-level component: ${Component.displayName}. This will cause all namespaces to be sent down to the client, possibly negatively impacting the performance of your app. For more info, see: https://github.com/isaachinman/next-i18next#4-declaring-namespace-dependencies`,
-      )
-
 
       // We must always send down the defaultNS, otherwise
       // the client will trigger a request for it and issue

@@ -34,6 +34,4 @@ export default {
   react: {
     wait: true,
   },
-  strictMode: true,
-  errorStackTraceLimit: 0,
 }
