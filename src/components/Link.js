@@ -19,7 +19,7 @@
 import React from 'react'
 import PropTypes from 'prop-types'
 import NextLink from 'next/link'
-import { parse as parseUrl } from 'url'
+import URI from 'urijs'
 
 export default function () {
 
@@ -34,10 +34,13 @@ export default function () {
         [lng] = i18n.languages
       }
       if (localeSubpaths && lng && lng !== defaultLanguage) {
-        const { pathname, query } = parseUrl(href, true /* parseQueryString */)
+        const hrefWithLang = URI(href)
+          .addQuery('lng', lng)
+          .normalizeQuery()
+          .toString()
 
         return (
-          <NextLink href={{ pathname, query: { ...query, lng } }} as={`/${lng}${as || href}`}>
+          <NextLink href={hrefWithLang} as={`/${lng}${as || href}`}>
             {children}
           </NextLink>
         )
