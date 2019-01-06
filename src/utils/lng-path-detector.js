@@ -1,8 +1,6 @@
-import { lngFromReq } from 'utils'
-
 export default (req, res, next) => {
   if (req.i18n) {
-    const language = lngFromReq(req)
+    const language = req.i18n.languages[0]
     const { allLanguages, defaultLanguage } = req.i18n.options
     /*
       If a user has hit a subpath which does not

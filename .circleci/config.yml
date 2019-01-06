@@ -8,44 +8,36 @@ jobs:
       - checkout
 
       - restore_cache:
-          name: Restore cache (main)
           keys:
           - v1-dependencies-{{ checksum "package.json" }}
           - v1-dependencies-
 
       - restore_cache:
-          name: Restore cache (example)
           keys:
           - v1-dependencies-{{ checksum "example/package.json" }}
           - v1-dependencies-
 
       - run:
-          name: Install dependencies (main)
+          name: Install dependencies
           command: yarn install
 
       - run:
-          name: Install dependencies (example)
-          command: yarn install
-
-      - run:
-          name: Build source (main)
+          name: Build source
           command: yarn build
 
       - run:
-          name: Build source (example)
+          name: Build example
           command: cd example && yarn && yarn build
 
       - save_cache:
-          name: Save cache (main)
-          paths:
-            - node_modules
-          key: v1-dependencies-{{ checksum "package.json" }}
-
-      - save_cache:
-          name: Save cache (example)
           paths:
             - example/node_modules
           key: v1-dependencies-{{ checksum "example/package.json" }}
+
+      - save_cache:
+          paths:
+            - node_modules
+          key: v1-dependencies-{{ checksum "package.json" }}
 
       - run:
           name: Lint

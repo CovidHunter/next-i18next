@@ -2,14 +2,14 @@ import React from 'react'
 import Router from 'next/router'
 
 import { I18nextProvider } from 'react-i18next'
-import { lngFromReq, lngPathCorrector } from 'utils'
+import { lngPathCorrector } from 'utils'
 import { NextStaticProvider } from 'components'
 
 import hoistNonReactStatics from 'hoist-non-react-statics'
 
 export default function (WrappedComponent) {
 
-  const { config, i18n } = this
+  const { config, consoleMessage, i18n } = this
 
   class AppWithTranslation extends React.Component {
 
@@ -56,7 +56,8 @@ export default function (WrappedComponent) {
       // Step 1: Determine initial language
       if (req && req.i18n) {
 
-        initialLanguage = lngFromReq(req)
+        // First language in array is current lang
+        [initialLanguage] = req.i18n.languages
 
         // Perform a lang change in case we're not on the right lang
         await i18n.changeLanguage(initialLanguage)
@@ -69,9 +70,12 @@ export default function (WrappedComponent) {
       let namespacesRequired = config.ns
       if (Array.isArray(pageProps.namespacesRequired)) {
         ({ namespacesRequired } = pageProps)
-      } else if (process.env.NODE_ENV !== 'production') {
-        console.warn(`You have not declared a namespacesRequired array on your page-level component: ${Component.displayName}. This will cause all namespaces to be sent down to the client, possibly negatively impacting the performance of your app. For more info, see: https://github.com/isaachinman/next-i18next#4-declaring-namespace-dependencies`)
       }
+      consoleMessage(
+        'warn',
+        `You have not declared a namespacesRequired array on your page-level component: ${Component.displayName}. This will cause all namespaces to be sent down to the client, possibly negatively impacting the performance of your app. For more info, see: https://github.com/isaachinman/next-i18next#4-declaring-namespace-dependencies`,
+      )
+
 
       // We must always send down the defaultNS, otherwise
       // the client will trigger a request for it and issue
