@@ -28,15 +28,28 @@ export default function (WrappedComponent) {
       }
     }
 
-    static async getInitialProps(ctx) {
+    static async getInitialProps({ Component, ctx, ...initObject }) {
 
-      let wrappedComponentProps = { pageProps: {} }
+      let pageProps = {}
+      let regularProps = {}
+
+      if (Component.getInitialProps) {
+        pageProps = await Component.getInitialProps(ctx)
+      }
+
+      // Run getInitialProps on wrapped _app
       if (WrappedComponent.getInitialProps) {
-        wrappedComponentProps = await WrappedComponent.getInitialProps(ctx)
+        const { pageProps: wrappedPageProps, ...rest } = await WrappedComponent
+          .getInitialProps({ Component, ctx, ...initObject })
+        pageProps = {
+          ...pageProps,
+          ...wrappedPageProps,
+        }
+        regularProps = rest
       }
 
       // Initiate vars to return
-      const { req } = ctx.ctx
+      const { req } = ctx
       let initialI18nStore = {}
       let initialLanguage = null
 
@@ -54,12 +67,12 @@ export default function (WrappedComponent) {
 
       // Step 2: Determine namespace dependencies
       let namespacesRequired = config.ns
-      if (Array.isArray(wrappedComponentProps.pageProps.namespacesRequired)) {
-        ({ namespacesRequired } = wrappedComponentProps.pageProps)
+      if (Array.isArray(pageProps.namespacesRequired)) {
+        ({ namespacesRequired } = pageProps)
       } else {
         consoleMessage(
           'warn',
-          `You have not declared a namespacesRequired array on your page-level component: ${ctx.Component.displayName || ctx.Component.name || 'Component'}. This will cause all namespaces to be sent down to the client, possibly negatively impacting the performance of your app. For more info, see: https://github.com/isaachinman/next-i18next#4-declaring-namespace-dependencies`,
+          `You have not declared a namespacesRequired array on your page-level component: ${Component.displayName || Component.name || 'Component'}. This will cause all namespaces to be sent down to the client, possibly negatively impacting the performance of your app. For more info, see: https://github.com/isaachinman/next-i18next#4-declaring-namespace-dependencies`,
         )
       }
 
@@ -108,7 +121,8 @@ export default function (WrappedComponent) {
       return {
         initialI18nStore,
         initialLanguage,
-        ...wrappedComponentProps,
+        pageProps,
+        ...regularProps,
       }
     }
 
