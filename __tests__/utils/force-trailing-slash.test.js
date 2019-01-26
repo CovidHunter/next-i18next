@@ -11,6 +11,7 @@ jest.mock('url', () => ({
 describe('forceTrailingSlash utility function', () => {
   let req
   let res
+  let next
 
   const mockParse = (pathname, search = '') => {
     parse.mockImplementation(() => ({
@@ -21,6 +22,9 @@ describe('forceTrailingSlash utility function', () => {
 
   beforeEach(() => {
     req = {
+      i18n: {
+        options: { allLanguages: ['en', 'de'] },
+      },
       url: '/',
     }
 
@@ -28,25 +32,41 @@ describe('forceTrailingSlash utility function', () => {
       redirect: jest.fn(),
       header: jest.fn(),
     }
+
+    next = jest.fn()
   })
 
   afterEach(() => {
     parse.mockReset()
   })
 
-  it('redirects from /en to /en/', () => {
-    mockParse('/en')
+  it('does not redirect if pathname is not /en or /de', () => {
+    mockParse('/')
 
-    forceTrailingSlash(req, res, 'en')
+    forceTrailingSlash(req, res, next)
 
-    expect(res.redirect).toBeCalledWith(302, '/en/')
+    expect(res.redirect).not.toBeCalled()
+
+    expect(next).toBeCalled()
   })
 
-  it('redirects from /de to /de/ (adds search params)', () => {
+  it('redirects if pathname is lang without trailing slash', () => {
+    mockParse('/en')
+
+    forceTrailingSlash(req, res, next)
+
+    expect(res.redirect).toBeCalledWith(302, '/en/')
+
+    expect(next).not.toBeCalled()
+  })
+
+  it('redirects if pathname is lang without trailing slash (adds search params)', () => {
     mockParse('/de', '?option1=value1')
 
-    forceTrailingSlash(req, res, 'de')
+    forceTrailingSlash(req, res, next)
 
     expect(res.redirect).toBeCalledWith(302, '/de/?option1=value1')
+
+    expect(next).not.toBeCalled()
   })
 })

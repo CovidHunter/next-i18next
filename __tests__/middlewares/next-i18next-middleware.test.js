@@ -1,151 +1,105 @@
 /* eslint-env jest */
 
 import i18nextMiddleware from 'i18next-express-middleware'
-import { forceTrailingSlash, handleLanguageSubpath, lngPathDetector } from 'utils'
-import testConfig from '../test-config'
+import { parse } from 'url'
 
 import nextI18nextMiddleware from '../../src/middlewares/next-i18next-middleware'
 
 jest.mock('i18next-express-middleware', () => ({
-  handle: jest.fn(() => jest.fn()),
+  handle: jest.fn(),
 }))
 
 jest.mock('utils', () => ({
-  forceTrailingSlash: jest.fn(),
-  handleLanguageSubpath: jest.fn(),
-  lngPathDetector: jest.fn(),
+  forceTrailingSlash: 'forceTrailingSlash',
+  lngPathDetector: 'lngPathDetector',
+}))
+
+jest.mock('url', () => ({
+  parse: jest.fn(),
 }))
 
 describe('next-18next middleware', () => {
+  let app
   let nexti18next
-  let req
-  let res
-  let next
+  let server
 
   beforeEach(() => {
+    app = {
+      render: jest.fn(),
+    }
+
     nexti18next = {
-      config: { ...testConfig.options },
+      config: {
+        allLanguages: ['en', 'de'],
+        ignoreRoutes: ['/_next', '/static'],
+        localeSubpaths: true,
+        serverLanguageDetection: true,
+      },
       i18n: 'i18n',
     }
 
-    req = {
-      url: '/myapp.com/',
+    server = {
+      get: jest.fn(),
+      use: jest.fn(),
     }
-    res = {}
-    next = jest.fn()
   })
 
-  afterEach(() => {
-    i18nextMiddleware.handle.mockClear()
+  it('uses i18nextMiddleware without localeSubpaths', () => {
+    nexti18next.config.localeSubpaths = false
 
-    forceTrailingSlash.mockReset()
-    handleLanguageSubpath.mockReset()
-    lngPathDetector.mockReset()
-  })
+    nextI18nextMiddleware(nexti18next, app, server)
 
-  const callAllMiddleware = () => {
-    const middlewareFunctions = nextI18nextMiddleware(nexti18next)
-
-    middlewareFunctions.forEach((middleware) => {
-      middleware(req, res, next)
-    })
-  }
-
-  it('sets up i18nextMiddleware handle on setup', () => {
-    callAllMiddleware()
-
+    expect(server.use).toBeCalled()
     expect(i18nextMiddleware.handle)
       .toBeCalledWith('i18n',
         expect.objectContaining({
           ignoreRoutes: expect.arrayContaining(['/_next', '/static']),
         }))
+
+    expect(server.get).not.toBeCalled()
   })
 
-  it('does not call any next-i18next middleware if localeSubpaths === false', () => {
-    nexti18next.config.localeSubpaths = false
+  it('uses i18nextMiddleware with localeSubpaths', () => {
+    nextI18nextMiddleware(nexti18next, app, server)
 
-    callAllMiddleware()
+    expect(server.use).toBeCalled()
+    expect(i18nextMiddleware.handle)
+      .toBeCalledWith('i18n',
+        expect.objectContaining({
+          ignoreRoutes: expect.arrayContaining(['/_next', '/static']),
+        }))
 
-    expect(forceTrailingSlash).not.toBeCalled()
-    expect(lngPathDetector).not.toBeCalled()
-    expect(handleLanguageSubpath).not.toBeCalled()
-  })
+    expect(server.get).toBeCalledTimes(3)
+    expect(server.get).toBeCalledWith(/^\/(?!_next|static).*$/, 'forceTrailingSlash')
+    expect(server.get).toBeCalledWith(/^\/(?!_next|static).*$/, 'lngPathDetector')
 
-  describe('localeSubpaths === true', () => {
-    beforeEach(() => {
-      nexti18next.config.localeSubpaths = true
-    })
+    expect(server.get.mock.calls[2][0]).toEqual('/:lng(en|de)/*')
 
-    it('does not call middleware, if route to ignore', () => {
-      req.url = '/_next/route'
+    const appRenderFunction = server.get.mock.calls[2][1]
+    const req = {
+      params: {
+        lng: 'en',
+      },
+    }
+    const res = {}
 
-      callAllMiddleware()
+    parse.mockImplementation(() => ({
+      pathname: '/en/foo',
+    }))
 
-      expect(forceTrailingSlash).not.toBeCalled()
-      expect(lngPathDetector).not.toBeCalled()
-      expect(handleLanguageSubpath).not.toBeCalled()
+    appRenderFunction(req, res)
 
-      expect(next).toBeCalled()
-    })
+    expect(app.render).toBeCalledWith(req, res, '/foo', { lng: 'en' })
 
-    it('calls forceTrailingSlash if root locale route without slash', () => {
-      req.url = '/de'
+    app.render.mockClear()
 
-      callAllMiddleware()
+    // with query parameters
+    req.query = {
+      option1: 'value1',
+    }
 
-      expect(forceTrailingSlash).toBeCalledWith(req, res, 'de')
+    appRenderFunction(req, res)
 
-      expect(next).not.toBeCalled()
-    })
-
-    it('does not call forceTrailingSlash if root locale route with slash', () => {
-      req.url = '/de/'
-
-      callAllMiddleware()
-
-      expect(forceTrailingSlash).not.toBeCalled()
-
-      expect(next).toBeCalled()
-    })
-
-    it('calls lngPathDetector if not a route to ignore', () => {
-      req.url = '/page/'
-
-      callAllMiddleware()
-
-      expect(lngPathDetector).toBeCalledWith(req, res)
-
-      expect(next).toBeCalled()
-    })
-
-    it('does not call lngPathDetector if a route to ignore', () => {
-      req.url = '/static/locales/en/common.js'
-
-      callAllMiddleware()
-
-      expect(lngPathDetector).not.toBeCalled()
-
-      expect(next).toBeCalled()
-    })
-
-    it('calls handleLanguageSubpath if a locale subpath route', () => {
-      req.url = '/de/page/'
-
-      callAllMiddleware()
-
-      expect(handleLanguageSubpath).toBeCalledWith(req, 'de')
-
-      expect(next).toBeCalled()
-    })
-
-    it('does not call handleLanguageSubpath if not a locale subpath route', () => {
-      req.url = '/page/'
-
-      callAllMiddleware()
-
-      expect(handleLanguageSubpath).not.toBeCalled()
-
-      expect(next).toBeCalled()
-    })
+    expect(app.render).toBeCalledWith(req, res, '/foo', { option1: 'value1', lng: 'en' })
   })
 })

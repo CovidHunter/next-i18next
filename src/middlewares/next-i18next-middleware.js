@@ -1,61 +1,31 @@
 import i18nextMiddleware from 'i18next-express-middleware'
-import { forceTrailingSlash, handleLanguageSubpath, lngPathDetector } from 'utils'
+import { forceTrailingSlash, lngPathDetector } from 'utils'
 import { parse } from 'url'
-import pathMatch from 'path-match'
 
-const route = pathMatch()
+export default function (nexti18next, app, server) {
 
-export default function (nexti18next) {
   const { config, i18n } = nexti18next
   const { allLanguages, ignoreRoutes, localeSubpaths } = config
 
   const ignoreRegex = new RegExp(`^\/(?!${ignoreRoutes.map(x => x.replace('/', '')).join('|')}).*$`)
-  const ignoreRoute = route(ignoreRegex)
-  const isI18nRoute = url => ignoreRoute(url)
-
-  const localeSubpathRoute = route(`/:lng(${allLanguages.join('|')})/*`)
-  const isLocaleSubpathRoute = params => params !== false
-
-  const isLocaleRootRouteWithoutSlash = pathname => allLanguages.some(lng => pathname === `/${lng}`)
-
-  const middleware = []
 
   if (!config.serverLanguageDetection) {
-    middleware.push((req, res, next) => {
-      if (isI18nRoute(req.url)) {
-        req.lng = config.defaultLanguage
-      }
+    server.get(ignoreRegex, (req, res, next) => {
+      req.lng = config.defaultLanguage
       next()
     })
   }
 
-  middleware.push(i18nextMiddleware.handle(i18n, { ignoreRoutes }))
+  server.use(i18nextMiddleware.handle(i18n, { ignoreRoutes }))
 
   if (localeSubpaths) {
-    middleware.push(
-      (req, res, next) => {
-        if (isI18nRoute(req.url)) {
-          const { pathname } = parse(req.url)
-
-          if (isLocaleRootRouteWithoutSlash(pathname)) {
-            forceTrailingSlash(req, res, pathname.slice(1))
-
-            return
-          }
-
-          lngPathDetector(req, res)
-
-          const params = localeSubpathRoute(req.url)
-
-          if (isLocaleSubpathRoute(params)) {
-            handleLanguageSubpath(req, params.lng)
-          }
-        }
-
-        next()
-      },
-    )
+    server.get(ignoreRegex, forceTrailingSlash)
+    server.get(ignoreRegex, lngPathDetector)
+    server.get(`/:lng(${allLanguages.join('|')})/*`, (req, res) => {
+      const { lng } = req.params
+      const { query } = req
+      const url = parse(req.url).pathname
+      app.render(req, res, url.replace(`/${lng}`, ''), { lng, ...query })
+    })
   }
-
-  return middleware
 }

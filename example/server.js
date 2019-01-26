@@ -11,13 +11,7 @@ const handle = app.getRequestHandler();
   await app.prepare()
   const server = express()
 
-  server.use(nextI18NextMiddleware(nextI18next))
-
-  server.get('/products/:id', (req, res) => {
-    const { query, params } = req
-
-    return app.render(req, res, '/product-page', { ...query, id: params.id })
-  })
+  nextI18NextMiddleware(nextI18next, app, server)
 
   server.get('*', (req, res) => handle(req, res))
 
